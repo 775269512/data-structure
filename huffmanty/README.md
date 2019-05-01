@@ -1,191 +1,402 @@
-# HuffmanImageCompression
 
-## 项目说明
+# Huffman压缩编码
 
-### 项目github
+## 1. 核心知识
 
-[HuffmanImageCompression](https://github.com/xujj25/HuffmanImageCompression)
+（1） 树的存储结构
+（2） 二叉树的三种遍历方法
+（3） Huffman树、Huffman编码算法
 
-### 项目语言
+## 2. 功能要求
 
-C++(std=C++11) 
+1.  针对一幅BMP格式的图片文件，统计256种不同字节的重复次数，以每种字节重复次数作为权值，构造一颗有256个叶子节点的哈夫曼二叉树。
 
-### 编写与测试操作系统平台
+2.  利用上述哈夫曼树产生的哈夫曼编码对图片文件进行压缩。
 
-ubuntu 16.04
+3.  压缩后的文件与原图片文件同名，加上后缀.huf（保留原后缀），如pic.bmp
+    压缩后pic.bmp.huf
 
-### 文件要求
+## 3.分析与设计
 
-- 目前项目仅可以对BMP图像文件进行压缩。
-- 压缩后的文件的扩展名为`.hfmc` ，压缩后文件结构为：
-  - 原图像文件头（54字节）
-  - 编码后图像数据总位数dataBitCount（4字节，即一个32为无符号整数）
-  - 原图像文件中不同的数据单元的数目weightMapValCount（4字节，即一个32为无符号整数）
-  - 权重映射表（表中每一项包含1个字节的原数据和4个字节即32位无符号整数表示的权重值，一共5个字节，表的总大小为weightMapValCount * 5）
-  - 编码数据，实际的编码数据位数为dataBitCount，最后一个字节的数据如果是不满8位，余下的位用0作为padding
+使用Huffman算法实现图片压缩程序，可分为6个步骤。
 
-### 算法流程
+（1）创建工程
 
-- 压缩
-  - 读取图像文件，每个像素包含RGB三个色彩通道，每个通道占1个字节，这是编码的单元。
-  - 对读取到的每个像素的色彩通道数据进行权重统计。
-  - 根据权重统计构建Huffman编码树。
-  - 从Huffman编码树的根节点开始向根节点进行DFS，产生编码表。
-  - 使用编码表对原来的每个通道的色彩通道数据进行编码。
-  - 将编码输出到自定义的编码文件中。
-- 解压缩
-  - 读取自定义的编码文件，根据对编码文件结构的定义将各个部分分割出来。
-  - 构造权重映射表，根据权重映射表重建Huffman编码树。
-  - 读取实际编码数据，根据每个位的数据所指定的方向，从根节点开始向下游历编码树，每次到达叶子节点的时候输出叶子节点的对应数据，再重新回到根节点开始下一次游历，直到读取完编码数据。
-  - 把得到的解码数据重新构建成图像格式，写入到图像文件中。
+创建HuffmanCompressCPro工程，定义入口函数int main()；
 
-### 项目结构
+（2）读取原文件
 
-![architecture](img/architecture.png)
+读取文件，统计256种字节重复的次数；
 
-在include目录包含了项目所需的各个类的定义，从上到下分别为：
+（3）生成Huffman树
 
-- 编码文件辅助类（用于储存编码文件的相关信息）
-- Huffman编码数据单元辅助类（考虑到数据量大的时候，使用字符串来保存码字会由较大的内存开销，所以创建了这个类，采用了与最后存储到文件中一样的位数据集保存形式来保存编码数据单元，也就是在Huffman编码树上的路径）
-- Huffman编码操作类（算法核心）
-- 图像文件辅助类（用于储存图片文件的相关信息）
-- 图像IO异常类（对C++的运行时错误类的扩展，用于报出实际文件IO中详细的错误）
-- 图像IO辅助类（用于进行图像和压缩后文件的读写）
+根据上一步统计的结果，构建Huffman树；
 
-### 关键代码
+（4）生成Huffman编码
 
-- 压缩：
+遍历Huffman树，记录256个叶子节点的路径，生成Huffman编码；
 
-  ```c++
-  void HuffmanCompression::getEncodedData(const unsigned char *rawDataPtr, uint32_t rawDataSize, unordered_map<unsigned char, uint32_t > &dstWeightMap, unsigned char *&outputDataPtr, uint32_t &outputDataBitSize) {
-      calcWeight(rawDataPtr, rawDataSize, dstWeightMap);  // 计算出权值映射表
-      generateEncodedNodeQueue(dstWeightMap);  // 根据权值映射表构建编码树节点队列（使用priority_queue这样一个以堆实现的“队列”，可以保证每次进出队操作后队列的节点保持权值从小到大排列）
-      buildTree();  // 建立编码树
-      unordered_map<unsigned char, hfmCodeBitSet> resCodeMap;
-      getCodeMap(resCodeMap);  // 根据编码树产生权值表
-      outputDataBitSize = calcEncodedOutputSize(dstWeightMap, resCodeMap);  // 计算编码数据位数
-      generateEncodedOutput(rawDataPtr, rawDataSize, resCodeMap, outputDataPtr, outputDataBitSize);  // 对原数据进行编码
-  }
-  ```
+（5）压缩编码
 
-- 解压：
+使用Huffman编码，对原文件中的字节重新编码，获得压缩后的文件数据；
 
-  ```c++
-  void HuffmanCompression::getDecodedData(const unsigned char *rawDataPtr, uint32_t rawDataBitSize, const vector<pair<unsigned char, uint32_t >> &srcWeightMapArr, unsigned char *&outputDataPtr, uint32_t &outputDataSize) {
-      generateDecodedNodeQueue(srcWeightMapArr);  // 根据读取文件之后构建的权值映射表构建节点队列
-      buildTree();  // 建立编码树
-      outputDataSize = calcDecodedOutputSize(srcWeightMapArr);  // 计算输出数据大小
-      generateDecodedOutput(rawDataPtr, rawDataBitSize, outputDataPtr, outputDataSize);  // 对编码数据进行解码
-  }
-  ```
-- 建立编码树：
-  ```c++
-  // 因为节点队列能够根据进出队列的节点的权值进行顺序调整，所以每次只需要从队首取出2个节点构造一棵树，将树根再次加进节点队列，直到队列只剩下一个节点，这个节点就是编码树的根节点
-  void HuffmanCompression::buildTree() {
-      while (nodeQueue.size() > 1) {
-          TreeNode* rightNode = nodeQueue.top();
-          nodeQueue.pop();
-          TreeNode* leftNode = nodeQueue.top();
-          nodeQueue.pop();
-          auto parentNode = new TreeNode(0, rightNode -> weight + leftNode -> weight);
-          parentNode -> left = leftNode;
-          parentNode -> right = rightNode;
-          nodeQueue.push(parentNode);
-      }
-      treeRoot = nodeQueue.top();
-  }
-  ```
-- 编码表的生成：
-  ```c++
-  // 深度优先搜索，过程中使用path来记录路径，到达每个叶子节点的path就是叶子节点对应数据的编码
-  void HuffmanCompression::dfs(TreeNode* node, hfmCodeBitSet& path,
-                               unordered_map<unsigned char, hfmCodeBitSet> &resCodeMap) {
-      if (node -> left == nullptr && node -> right == nullptr) {
-          resCodeMap[node -> val] = path;
-          return;
-      }
-      path.append(0);
-      dfs(node -> left, path, resCodeMap);
-      path.pop_back();
-      path.append(1);
-      dfs(node -> right, path, resCodeMap);
-      path.pop_back();
-  }
+（6）保存文件
 
-  // 生成编码表：调用dfs来生成编码表
-  void HuffmanCompression::getCodeMap(unordered_map<unsigned char, hfmCodeBitSet> &resCodeMap) {
-      if (treeRoot == nullptr)
-          return;
-      hfmCodeBitSet path;
-      dfs(treeRoot, path, resCodeMap);
-  }
-  ```
+将编码过的数据，保存到文件“Pic.bmp.huf”中。
 
-## 运行方式：
+## 4. 数据结构的设计
 
-终端输入：
+1.记录统计256种不同字节的重复次数即权值使用整型数组：
 
-```bash
-bash compile.sh
+> unsigned int weight[256];
+
+2.二叉树的存储结构。使用结构体存储节点，使用数组存储树的节点，使用静态二叉链表方式存储二叉树。
+```c++
+struct HuffNode
+{
+	unsigned char ch;  //字节符
+	int weight;  //字节出现频度
+	int parent; //父节点
+	int lchild;  //左孩子
+	int rchild;  //右孩子
+	char bits[256]; // 哈夫曼编码
+};
+
+// Huffman树
+typedef char** HuffmanCode;
 ```
 
-即可编译
+3.Huffman编码存储结构定义一个二维数组:
 
-输入
+> typedef char** HuffmanCode;
+
+
+4.压缩文件的算法的数据结构:
+
+为正确解压文件，除了要保存原文件长度外，还要保存原文件中256种字节重复的次数，即权值。定义一个文件头，保存相关的信息：
+```c++
+struct FILESTRUCT
+{
+	int sum;
+	int fileid;
+};
 ```
-./bin/main
+
+
+## 5. 核心算法设计
+
+**（1）构造Huffman树算法 **
+```c++
+int CreateHuffmanTree(HuffNode *huf_tree, int n)//构造huffman树
+{
+	int i;
+	int s1, s2;
+	for (i = n; i < 2 * n - 1; ++i)
+	{
+		select(huf_tree, i, &s1, &s2);		// 选择最小的两个结点
+		huf_tree[s1].parent = i;            //原点双亲为i
+		huf_tree[s2].parent = i;
+		huf_tree[i].lchild = s1;               //新结点左子树是最小的s1
+		huf_tree[i].rchild = s2;               //新结点右子树是最小s2
+		huf_tree[i].weight = huf_tree[s1].weight + huf_tree[s2].weight;////新结点的权值
+	}
+	return OK;
+}
+
+void select(HuffNode *huf_tree, int n, int *s1, int *s2)//在HT[1~I-1】选择parent为零且为最小的两个数，序号分别为s1,s2
+{
+	// 找最小结点
+	unsigned int i;
+	unsigned long min = LONG_MAX;
+	for (i = 0; i < n; i++)
+		if (huf_tree[i].parent == -1 && huf_tree[i].weight < min)
+		{
+			min = huf_tree[i].weight;
+			*s1 = i;//记录下标
+		}
+	huf_tree[*s1].parent = 1;   // 标记此结点已被选中
+
+								// 找次小结点
+	min = LONG_MAX;
+	for (i = 0; i < n; i++)
+	{
+		if (huf_tree[i].parent == -1 && huf_tree[i].weight < min)
+		{
+			min = huf_tree[i].weight;
+			*s2 = i;
+		}
+	}
+}
+```
+**（2）生成Huffman编码算法 **
+```c++
+int HuffmanCoding(HuffNode *huf_tree, int n)
+{
+	int i;
+	int cur, next, index;
+	char code_tmp[256];		// 暂存编码，最多256个叶子，编码长度不超多255
+	code_tmp[255] = '\0';
+
+	for (i = 0; i < n; ++i)
+	{
+		index = 256 - 1;	// 编码临时空间初始化
+
+							// 从叶子向根求编码
+		for (cur = i, next = huf_tree[i].parent; next != -1; next = huf_tree[next].parent)
+		{
+			if (huf_tree[next].lchild == cur)
+				code_tmp[--index] = '0';	// 左‘0’
+			else
+				code_tmp[--index] = '1';	// 右‘1’
+
+			cur = next;
+
+		}
+		strcpy(huf_tree[i].bits, &code_tmp[index]);     // 正向保存编码到树结点相应域 index是第一个
+	}
+	return OK;
+}
+
+```
+**（4）生成压缩文件算法：**
+```int compress(HuffNode huf_tree[], int n, long flength, char *ifname, char *ofname)
+{
+	FILE * inFile = fopen(ifname, "rb");//打开要压缩文件
+	FILE * outFile = fopen(ofname, "wb");//打开压缩后文件
+
+	unsigned char temp = '\0';            //8bit临时的变量
+
+	char buffer[256] = "\0";           //缓存流
+
+	char tou[20];                     //文件后缀名字符数组
+	int z = 0;
+	int strLen = strlen(ifname);//文件后缀名长度
+	for (int g = strLen - 1; g>0; g--)//获取文件后缀名（从后面获取）
+	{
+		if (ifname[g] == '.')//获取文件后缀名最后一个“.”
+		{
+			for (int k = g; k< strLen; k++)
+			{
+				z++;
+				tou[z] = ifname[k];
+
+			}
+		}
+	}
+
+	tou[0] = z + '0';//获取文件后缀名长度(转成字符)
+	fwrite((char *)&tou, sizeof(char), z + 1, outFile);//存文件头部
+	fwrite(&flength, sizeof(long), 1, outFile);//存总长度
+	fwrite(&n, sizeof(int), 1, outFile);//存字符的种类
+
+	for (int i = 0; i < n; i++) {//存每个编号对应的字符,权重
+		fwrite(&huf_tree[i].ch, sizeof(unsigned char), 1, outFile);
+		fwrite(&huf_tree[i].weight, sizeof(long), 1, outFile);
+		/*for (int f = 0; huf_tree[i].bits[f] == '0' || huf_tree[i].bits[f] == '1'; f++)
+		{
+		fwrite(&huf_tree[i].bits[f], sizeof(char), 1, outFile);
+		}*/
+	}
+
+
+	while (fread(&temp, sizeof(unsigned char), 1, inFile))//文件不为空
+	{
+		for (int i = 0; i <n; i++)//找对应字符
+		{
+			if (temp == huf_tree[i].ch)
+			{
+				for (int f = 0; huf_tree[i].bits[f] == '0' || huf_tree[i].bits[f] == '1'; f++)//过滤掉非0非1的编码（数组带来的弊端）
+				{
+					strncat(buffer, &huf_tree[i].bits[f], 1);//给缓存流赋值
+				}
+			}
+
+		}
+		while (strlen(buffer) >= 8)//缓存流大于等于8个bits进入循环 
+		{
+			temp = 0;
+			for (int i = 0; i < 8; i++)//每8个bits循环一次
+			{
+				temp = temp << 1;//左移1
+				if (buffer[i] == '1')//如果是为1，就按位为1
+				{
+					temp = temp | 0x01;//在不影响其他位的情况下，最后位置1
+				}
+			}
+			fwrite(&temp, sizeof(unsigned char), 1, outFile);//写入文件
+			strcpy(buffer, buffer + 8);//将写入文件的bits删除
+		}
+	}
+	int m = strlen(buffer);//将剩余不足为8的bits的个数给l
+	if (m) {
+		temp = 0;
+		for (int i = 0; i < m; i++)
+		{
+			temp = temp << 1;//移动1
+			if (buffer[i] == '1')//如果是为1，就按位为1
+			{
+				temp = temp | 0x01;
+			}
+
+		}
+		temp <<= 8 - m;// // 将编码字段从尾部移到字节的高位
+		fwrite(&temp, sizeof(unsigned char), 1, outFile);//写入最后一个
+	}
+
+	fclose(inFile);
+	fclose(outFile);
+	return 1;
+}//compress
+```
+**（5）解压算法：**
+```c++
+int extract(HuffNode huf_tree[],  char *ifname, char *ofname)
+{
+	int i;
+	char huozui;                          //文件后缀长度
+	char tou[20];                         //文件后缀字符
+	long flength;                         //文件总长度
+	int n;                               //字符种类
+	int node_num;                        //结点总数
+	unsigned long writen_len = 0;		// 控制文件写入长度
+	FILE *infile, *outfile;
+	unsigned char code_temp;		// 暂存8bits编码
+	unsigned int root;		// 保存根节点索引，供匹配编码使用
+
+	infile = fopen(ifname, "rb");		// 以二进制方式打开压缩文件
+	// 判断输入文件是否存在
+	if (infile == NULL)
+		return -1;
+
+	//读取文件后缀名长度
+	fread(&huozui, sizeof(char),1,infile);
+	//字符转数字
+	int huozui_du = huozui - '0';
+	//读取文件后缀字符
+	fread(&tou, sizeof(char), huozui_du, infile); //读取文件后缀字符
+	fread(&flength, sizeof(long), 1, infile);    //读取文件总长度
+	fread(&n, sizeof(int), 1, infile);          //读取字符种类
+
+	node_num = 2 * n - 1;		// 根据字符种类数，计算建立哈夫曼树所需结点数 
+		
+	// 初始化后
+	for (int a = 0; a < 512; a++)    
+	{
+		huf_tree[a].parent = -1;
+		huf_tree[a].ch = NULL;
+		huf_tree[a].weight = -1;
+		huf_tree[a].lchild = -1;
+		huf_tree[a].rchild = -1;
+	}
+
+	// 读取压缩文件前端的字符及对应权重，用于重建哈夫曼树
+	for (i = 0; i < n; i++)
+	{
+		fread((char *)&huf_tree[i].ch, sizeof(unsigned char), 1, infile);		// 读入字符
+		fread((char *)&huf_tree[i].weight, sizeof(long), 1, infile);	// 读入字符对应权重
+	}
+
+	CreateHuffmanTree(huf_tree, n);//构建哈夫曼仿真指针孩子父亲表示法
+	HuffmanCoding(huf_tree, n);//生成哈夫曼编码
+
+
+	//printf("\n");
+	//for (int d = 0; d < 2 * n - 1; d++)//仅供测试
+	//{
+	//	printf("%4d: %4u,   %9d,  %9d,   %9d,  %9d       ", d, huf_tree[d].ch, huf_tree[d].count, huf_tree[d].parent, huf_tree[d].lch, huf_tree[d].rch);  /* 用于测试 */
+
+	//	for (int f = 0; huf_tree[d].bits[f] == '0' || huf_tree[d].bits[f] == '1'; f++)
+	//		printf("%c", huf_tree[d].bits[f]);
+	//	printf("\n");
+	//}
+
+	strncat(ofname, tou, huozui_du);
+
+	outfile = fopen(ofname, "wb");		// 打开压缩后将生成的文件
+	root = node_num - 1;                //根结点的下标
+	while (1)
+	{
+		fread(&code_temp, sizeof(unsigned char), 1, infile);		// 读取一个字符长度的编码
+
+		// 处理读取的一个字符长度的编码（通常为8位）
+		for (i = 0; i < 8; i++)
+		{
+			// 由根向下直至叶节点正向匹配编码对应字符（逆向）
+			if (code_temp & 128)//128是1000 0000   按位与就是编码缓存的最高位是否为1
+				root = huf_tree[root].rchild;//为1，root=右子树
+			else
+				root = huf_tree[root].lchild;//为0，root=左子树
+
+			if (root < n)//0到n-1的左右子树为-1
+			{
+				fwrite(&huf_tree[root].ch, sizeof(unsigned char), 1, outfile);
+				writen_len++;//已编译字符加一
+				if (writen_len == flength) break;		// 控制文件长度，跳出内层循环
+				root = node_num - 1;        // 复位为根索引，匹配下一个字符
+			}
+			code_temp <<= 1;		// 将编码缓存的下一位移到最高位，提供匹配
+		}
+		if (writen_len == flength) break;		// 控制文件长度，跳出外层循环
+	}
+
+   //关闭文件
+	fclose(infile);
+	fclose(outfile);
+	return 1;
+}//extract()
 ```
 
-即可运行
+## 6. 开发环境
 
-根据提示可以完成图像压缩和解压
+* Windows10_x64
+* Microsoft Visual Studio 2017以上开发环境
 
-### 示例
+## 7. 调试说明
 
+调试主要内容为编写程序的语法正确性与否，程序逻辑的正确性与否。调试手段主要采用了Microsoft Visual Studio 2017集成开发环境中“调试（D）”菜单中的调试方法或手段。即：F5：启动调试；F11：逐语句调试；F12：逐过程调试；F9：切换断点；ctrl+B：新建断点等。并且根据VS2017的文本编辑器智能语法提示修改已知错误，然后启用调试，待调试通过检查运行结果，最后用边界值等进行多方面测试，保证程序的健壮性。
 
-![make](img/make_output.png)
+1. 在读取图片文件统计0-255个字符的权值的过程中，一开始采用了C\++的ifstream fin(“Pic.bmp”)文件流，然后通过while(fin>>ch){ cout<<ch;}测试输出文件字符码，就出现了无限循环，一直连续不断地输出6位十六进制的数。当时认为是文件流读取方式的原因，加了iOS::binary来控制采用二进制形式，还是没有解决。改用C语言的FILE *fp = fope( )终于可以正常读取输出文件字符码，但是还是没有找出C\++读取失败的原因。
 
+2. 为了便于压缩，解压文件，节点增加huffman编码`char bits[256] `以及字节符`unsigned char ch`
+文件压缩时将文件头部，总长度，字符种类和权重持久化，便于解压缩。
 
-![run](img/run_output.png)
+3. 编译时总是提示fopen，strcpy，strcat等函数存在不安全问题，采用了3中方法中一种屏蔽了该报错。即在文件开头添加：
+> \#pragma warning(disable:4996)
 
-## 测试结果
+## 8. 测试效果
 
-### 原始图像和压缩后恢复图像的视觉对比
+使用屏幕截图编辑成bmp图片文件pic.bmp测试哈夫曼压缩程序效果截图如下
+各图。图1为输入文件名压缩成功界面；图2为读取Pic.bmp产生的部分不同权值字节信息；图3、4为Pic.bmp生成的HuffmanTree结点信息；图5为生成的Huffman编码信息；图6为Pic.bmp压缩大小及压缩率。
 
-  ![compare](img/compare.png)
-- 可以看到，原始图像（test.bmp）和压缩后恢复图像（out.bmp）的视觉对比上没有区别。
+图1：输入文件名压缩成功界面
 
-### 评价和对比压缩率和 SNR 失真度量
+![](https://ae01.alicdn.com/kf/HTB1svr2TOLaK1RjSZFxq6ymPFXaL.jpg)
 
-- 压缩率对比
+图2压缩文件大小对比
 
-  - 对色彩较为丰富的图像，权值映射表较大，压缩效果较差。测试图片：
+![](https://ae01.alicdn.com/kf/HTB1TLnFTHvpK1RjSZPiq6zmwXXaz.jpg)
 
-    ![big_test](img/big_test.jpg)
+图3:文件解压
 
-    输出：
+![](https://ae01.alicdn.com/kf/HTB18nHETH2pK1RjSZFsq6yNlXXag.jpg)
 
-    ![big_test_out](img/big_test_out.png)
+图4：源文件与解压文件对比
 
-    可以看到压缩前后文件大小比值为93.81% 。
+![](https://ae01.alicdn.com/kf/HTB16xPBTSzqK1RjSZPxq6A4tVXaL.jpg)
 
-  - 对色彩较为简单的图像，权值映射表较小，压缩效果较好。测试图片：
+图5：对于jpg格式的压缩
 
-    ![test2](img/test2.png)
+![](https://ae01.alicdn.com/kf/HTB1CkzLTQvoK1RjSZFNq6AxMVXaE.jpg)
+## 9. 综合分析和结论
 
-    输出：
+（1）在哈弗曼编码的过程中，对字符按概率有大到小的顺序重新排列，应使合并后的新符号尽可能排在靠前的位置，这样可使合并后的新符号重复编码次数减少，使短码得到充分利用。
 
-    ![run_output](img/run_output.png)
+（2）哈弗曼编码效率相当高，对编码器的要求也简单得多。
 
-    可以看到压缩前后文件大小比值为84.55% 。
+（3）哈弗曼它保证了出现概率大的符号对应于短码，概率小的符号对应于长码，每次字符的最后两个码字总是最后一位码元不同，前面的各位码元都相同，每次字符的最长两个码字有相同的码长。
 
-  - 总的来说压缩前后文件大小比值范围在80～95% 。
+（4）哈弗曼的编法并不一定是唯一的。
 
-- 信噪比和失真度量
-
-  - 本项目采用无损Huffman编码压缩图像，可以保证压缩前后图像完全一致，图像不会失真。
-
-
-## 总结
-
-本项目没有选用matlab或者python这些编码效率较高的语言来完成，而是选用了C++，是想实际体会下如何写出一个真正好用、效率较高的压缩程序。确实过程中还有很多很多基本的压缩算法之外的问题需要思考，包括文件IO、结果保存、时间复杂度和内存占用量，还有很重要的异常处理部分。并且由于程序中涉及动态内存使用的地方很多，稍有不慎就会造成内存问题，包括很难察觉得到的内存泄漏问题，所以编写过程中借助了Valgrind这一内存分析工具对整个程序的内存使用情况进行了排查，消除了绝大部分可能存在的内存使用问题。不过在项目完成之后回顾了有关C++11的一些知识，发现其实要规避内存问题的话，可以选用智能指针，这需要在后面的学习中进一步进行实践了。
+（5）通过上述测试用例的效果截图，可以看出：使用哈夫曼编码对格式为bmp的图片文件的压缩比在50%左右，针对jpg格式图片压缩或出现图片严重失真现象。
+## 10.项目原码
+[github](https://github.com/ljyslyc/data-structure/tree/master/huffmanty)
