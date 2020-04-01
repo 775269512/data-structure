@@ -1,5 +1,5 @@
 # data-structure
 
-## 数据结构与算法设练习
+## 数据结构与算法练习
 
 C++、Python
