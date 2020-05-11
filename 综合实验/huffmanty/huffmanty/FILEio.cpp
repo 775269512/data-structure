@@ -12,7 +12,9 @@ int readFILE(HuffNode hufftree[], string InFile)
 	FILESTRUCT z[256] = { 0 };
 	for (int k = 0; k < 256; k++)//初始化
 		z[k].fileid = k;
-	infile.open(InFile); //打开文件
+    char filename[50];
+	strcpy(filename, InFile.c_str());
+	infile.open(filename); //打开文件
 	if (!infile)
 	{
 		std::cout << " 打开文件失败 " << std::endl;
