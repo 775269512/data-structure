@@ -4,8 +4,8 @@
 CPP      = g++.exe -D__DEBUG__
 CC       = gcc.exe -D__DEBUG__
 WINDRES  = windres.exe
-OBJ      = huffmanty/FILEio.o huffmanty/huffmantree.o huffmanty/ioimg.o huffmanty/main.o
-LINKOBJ  = huffmanty/FILEio.o huffmanty/huffmantree.o huffmanty/ioimg.o huffmanty/main.o
+OBJ      = BinTreeUtils.o HuffmanDecoder-(ŒﬁpLen≈–∂œ).o HuffmanDecoder-(”–pLen≈–∂œ).o HuffmanDecoder.o HuffmanEncoder.o main.o
+LINKOBJ  = BinTreeUtils.o HuffmanDecoder-(ŒﬁpLen≈–∂œ).o HuffmanDecoder-(”–pLen≈–∂œ).o HuffmanDecoder.o HuffmanEncoder.o main.o
 LIBS     = -L"C:/Dev-Cpp/MinGW64/lib" -L"C:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -static-libgcc -g3
 INCS     = -I"C:/Dev-Cpp/MinGW64/include" -I"C:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"C:/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include"
 CXXINCS  = -I"C:/Dev-Cpp/MinGW64/include" -I"C:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"C:/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"C:/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++"
@@ -24,14 +24,20 @@ clean: clean-custom
 $(BIN): $(OBJ)
 	$(CPP) $(LINKOBJ) -o $(BIN) $(LIBS)
 
-huffmanty/FILEio.o: huffmanty/FILEio.cpp
-	$(CPP) -c huffmanty/FILEio.cpp -o huffmanty/FILEio.o $(CXXFLAGS)
+BinTreeUtils.o: BinTreeUtils.cpp
+	$(CPP) -c BinTreeUtils.cpp -o BinTreeUtils.o $(CXXFLAGS)
 
-huffmanty/huffmantree.o: huffmanty/huffmantree.cpp
-	$(CPP) -c huffmanty/huffmantree.cpp -o huffmanty/huffmantree.o $(CXXFLAGS)
+HuffmanDecoder-(ŒﬁpLen≈–∂œ).o: HuffmanDecoder-(ŒﬁpLen≈–∂œ).cpp
+	$(CPP) -c HuffmanDecoder-(ŒﬁpLen≈–∂œ).cpp -o HuffmanDecoder-(ŒﬁpLen≈–∂œ).o $(CXXFLAGS)
 
-huffmanty/ioimg.o: huffmanty/ioimg.cpp
-	$(CPP) -c huffmanty/ioimg.cpp -o huffmanty/ioimg.o $(CXXFLAGS)
+HuffmanDecoder-(”–pLen≈–∂œ).o: HuffmanDecoder-(”–pLen≈–∂œ).cpp
+	$(CPP) -c HuffmanDecoder-(”–pLen≈–∂œ).cpp -o HuffmanDecoder-(”–pLen≈–∂œ).o $(CXXFLAGS)
 
-huffmanty/main.o: huffmanty/main.cpp
-	$(CPP) -c huffmanty/main.cpp -o huffmanty/main.o $(CXXFLAGS)
+HuffmanDecoder.o: HuffmanDecoder.cpp
+	$(CPP) -c HuffmanDecoder.cpp -o HuffmanDecoder.o $(CXXFLAGS)
+
+HuffmanEncoder.o: HuffmanEncoder.cpp
+	$(CPP) -c HuffmanEncoder.cpp -o HuffmanEncoder.o $(CXXFLAGS)
+
+main.o: main.cpp
+	$(CPP) -c main.cpp -o main.o $(CXXFLAGS)
